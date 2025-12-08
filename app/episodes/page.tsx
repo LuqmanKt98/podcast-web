@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
 import { updateDoc, deleteDoc, doc } from 'firebase/firestore';
 import Header from '@/components/Header';
@@ -10,6 +10,7 @@ import FilterPanel, { FilterState } from '@/components/FilterPanel';
 import SearchBar from '@/components/SearchBar';
 import FloatingButton from '@/components/FloatingButton';
 import SkeletonLoader from '@/components/SkeletonLoader';
+import MergeManager from '@/components/MergeManager';
 import { Episode } from '@/lib/types';
 import { loadEpisodes, filterEpisodes, sortEpisodes, searchEpisodes, clearCache } from '@/lib/data';
 import { db } from '@/lib/firebase';
@@ -25,15 +26,16 @@ export default function EpisodesPage() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [filters, setFilters] = useState<FilterState>({ sortBy: 'date-desc' });
+  const [showMergeManager, setShowMergeManager] = useState(false);
 
   const handleEpisodeUpdate = async (episodeId: string, updates: Partial<Episode>) => {
     const episode = episodes.find(e => e.id === episodeId);
     const docId = episode?.firestoreId || episodeId;
-    
+
     try {
       await updateDoc(doc(db, 'episodes', docId), updates);
       clearCache();
-      setEpisodes(prev => prev.map(ep => 
+      setEpisodes(prev => prev.map(ep =>
         ep.id === episodeId ? { ...ep, ...updates } : ep
       ));
       toast.success('Episode updated successfully');
@@ -46,7 +48,7 @@ export default function EpisodesPage() {
   const handleEpisodeDelete = async (episodeId: string) => {
     const episode = episodes.find(e => e.id === episodeId);
     const docId = episode?.firestoreId || episodeId;
-    
+
     try {
       await deleteDoc(doc(db, 'episodes', docId));
       clearCache();
@@ -55,6 +57,18 @@ export default function EpisodesPage() {
     } catch (error) {
       console.error('Delete error:', error);
       toast.error(`Failed to delete: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  };
+
+  // Function to refresh episodes data
+  const refreshEpisodes = async () => {
+    try {
+      clearCache();
+      const data = await loadEpisodes();
+      setEpisodes(data);
+      setFilteredEpisodes(data);
+    } catch (error) {
+      console.error('Error refreshing episodes:', error);
     }
   };
 
@@ -127,10 +141,23 @@ export default function EpisodesPage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: reducedMotion ? 0 : 0.6 }}
         >
-          <h1 className="text-4xl font-bold gradient-text mb-3">All Episodes</h1>
-          <p className="text-caption text-lg">
-            Showing {filteredEpisodes.length} of {episodes.length} episodes
-          </p>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <h1 className="text-4xl font-bold gradient-text mb-3">All Episodes</h1>
+              <p className="text-caption text-lg">
+                Showing {filteredEpisodes.length} of {episodes.length} episodes
+              </p>
+            </div>
+            <button
+              onClick={() => setShowMergeManager(true)}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-xl font-semibold hover:from-purple-700 hover:to-blue-700 transition-all shadow-lg hover:shadow-xl"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+              </svg>
+              Manage Duplicates
+            </button>
+          </div>
         </motion.div>
 
         <motion.div
@@ -144,12 +171,12 @@ export default function EpisodesPage() {
 
         <div className="space-y-8">
           <FilterPanel episodes={episodes} onFilterChange={setFilters} />
-          
+
           {filteredEpisodes.length > 0 ? (
             <div className="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {filteredEpisodes.map((episode, index) => (
                 <div key={`${episode.id}-${index}`}>
-                  <EditableEpisodeCard 
+                  <EditableEpisodeCard
                     episode={episode}
                     onSave={handleEpisodeUpdate}
                     onDelete={handleEpisodeDelete}
@@ -184,6 +211,17 @@ export default function EpisodesPage() {
       </main>
 
       <FloatingButton />
+
+      {/* Merge Manager Modal */}
+      <AnimatePresence>
+        {showMergeManager && (
+          <MergeManager
+            episodes={episodes}
+            onMergeComplete={refreshEpisodes}
+            onClose={() => setShowMergeManager(false)}
+          />
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }

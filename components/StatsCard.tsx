@@ -8,7 +8,7 @@ import { prefersReducedMotion } from '@/lib/animations';
 interface StatsCardProps {
   label: string;
   value: string | number;
-  icon?: React.ReactNode;
+  icon?: React.ReactNode | string;
   color?: 'blue' | 'purple' | 'green' | 'orange';
 }
 
@@ -35,7 +35,8 @@ export default function StatsCard({
   const { ref, isVisible } = useScrollAnimation({ threshold: 0.1 });
   const reducedMotion = prefersReducedMotion();
   const isNumeric = typeof value === 'number';
-  const isDateRange = typeof value === 'string' && value.includes('to');
+  const isDateRange = typeof value === 'string' && (value.includes(' to ') || value.includes(' - '));
+  const dateRangeSeparator = typeof value === 'string' && value.includes(' - ') ? ' - ' : ' to ';
 
   return (
     <motion.div
@@ -48,10 +49,10 @@ export default function StatsCard({
     >
       {/* Gradient overlay */}
       <div className="absolute inset-0 bg-gradient-to-br from-white/20 to-transparent" />
-      
+
       {/* Floating orb effect */}
       <div className={`absolute -top-4 -right-4 w-16 h-16 rounded-full ${iconColorClasses[color]} opacity-10 blur-xl`} />
-      
+
       <div className="relative z-10 h-full flex flex-col justify-between">
         <div className="flex items-start justify-between">
           <p className="text-sm font-bold text-slate-700 uppercase tracking-wide">{label}</p>
@@ -66,7 +67,7 @@ export default function StatsCard({
             </motion.div>
           )}
         </div>
-        
+
         <motion.div
           initial={reducedMotion ? { opacity: 1 } : { opacity: 0 }}
           animate={isVisible ? { opacity: 1 } : { opacity: 0 }}
@@ -84,11 +85,11 @@ export default function StatsCard({
           ) : isDateRange ? (
             <div className="space-y-0.5">
               <div className="text-base font-bold gradient-text leading-tight">
-                {(value as string).split(' to ')[0]}
+                {(value as string).split(dateRangeSeparator)[0]}
               </div>
               <div className="text-xs text-slate-500 font-medium">to</div>
               <div className="text-base font-bold gradient-text leading-tight">
-                {(value as string).split(' to ')[1]}
+                {(value as string).split(dateRangeSeparator)[1]}
               </div>
             </div>
           ) : (

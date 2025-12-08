@@ -24,11 +24,37 @@ export default function EditableEpisodeCard({ episode, onSave, onDelete }: Edita
     guests: episode.guests?.join(', ') || '',
   });
 
-  const formattedDate = episode.date ? new Date(episode.date).toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  }) : 'No date';
+  const formatDate = (dateStr: string) => {
+    if (!dateStr || dateStr === 'N/A') return 'No date';
+    try {
+      // Handle YYYY-MM-DD
+      const parts = dateStr.split('-');
+      if (parts.length === 3) {
+        const [year, month, day] = parts.map(Number);
+        const date = new Date(year, month - 1, day);
+        if (!isNaN(date.getTime())) {
+          return date.toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric',
+          });
+        }
+      }
+
+      const date = new Date(dateStr);
+      return !isNaN(date.getTime())
+        ? date.toLocaleDateString('en-US', {
+          year: 'numeric',
+          month: 'short',
+          day: 'numeric',
+        })
+        : dateStr;
+    } catch {
+      return dateStr;
+    }
+  };
+
+  const formattedDate = formatDate(episode.date);
 
   const handleSave = () => {
     const updates: Partial<Episode> = {
@@ -75,78 +101,78 @@ export default function EditableEpisodeCard({ episode, onSave, onDelete }: Edita
           onCancel={() => setShowConfirm(false)}
         />
         <div className="group relative overflow-hidden backdrop-blur-sm bg-white/90 border-2 border-blue-200 rounded-2xl shadow-xl p-4 space-y-3 min-h-[500px]">
-        <h4 className="font-semibold text-slate-800 text-sm mb-3">Edit Episode</h4>
-        
-        <div className="space-y-2">
-          <input
-            type="text"
-            value={editData.series}
-            onChange={(e) => setEditData({...editData, series: e.target.value})}
-            placeholder="Series"
-            className="w-full px-2 py-1.5 border border-gray-300 rounded focus:border-blue-500 outline-none text-xs"
-          />
-          
-          <input
-            type="text"
-            value={editData.episodeNumber}
-            onChange={(e) => setEditData({...editData, episodeNumber: e.target.value})}
-            placeholder="Episode #"
-            className="w-full px-2 py-1.5 border border-gray-300 rounded focus:border-blue-500 outline-none text-xs"
-          />
-          
-          <textarea
-            value={editData.episodeTitle}
-            onChange={(e) => setEditData({...editData, episodeTitle: e.target.value})}
-            placeholder="Episode Title"
-            rows={2}
-            className="w-full px-2 py-1.5 border border-gray-300 rounded focus:border-blue-500 outline-none text-xs resize-none"
-          />
-          
-          <input
-            type="date"
-            value={editData.date}
-            onChange={(e) => setEditData({...editData, date: e.target.value})}
-            className="w-full px-2 py-1.5 border border-gray-300 rounded focus:border-blue-500 outline-none text-xs"
-          />
-          
-          <textarea
-            value={editData.hosts}
-            onChange={(e) => setEditData({...editData, hosts: e.target.value})}
-            placeholder="Hosts (comma separated)"
-            rows={2}
-            className="w-full px-2 py-1.5 border border-gray-300 rounded focus:border-blue-500 outline-none text-xs resize-none"
-          />
-          
-          <textarea
-            value={editData.guests}
-            onChange={(e) => setEditData({...editData, guests: e.target.value})}
-            placeholder="Guests (comma separated)"
-            rows={2}
-            className="w-full px-2 py-1.5 border border-gray-300 rounded focus:border-blue-500 outline-none text-xs resize-none"
-          />
-        </div>
+          <h4 className="font-semibold text-slate-800 text-sm mb-3">Edit Episode</h4>
 
-        <div className="flex flex-col gap-1 pt-3 border-t">
-          <button
-            onClick={handleSave}
-            className="w-full px-3 py-1.5 bg-green-500 text-white rounded hover:bg-green-600 text-xs font-medium"
-          >
-            Save
-          </button>
-          <button
-            onClick={handleCancel}
-            className="w-full px-3 py-1.5 bg-gray-500 text-white rounded hover:bg-gray-600 text-xs font-medium"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleDelete}
-            className="w-full px-3 py-1.5 bg-red-500 text-white rounded hover:bg-red-600 text-xs font-medium"
-          >
-            Delete
-          </button>
+          <div className="space-y-2">
+            <input
+              type="text"
+              value={editData.series}
+              onChange={(e) => setEditData({ ...editData, series: e.target.value })}
+              placeholder="Series"
+              className="w-full px-2 py-1.5 border border-gray-300 rounded focus:border-blue-500 outline-none text-xs"
+            />
+
+            <input
+              type="text"
+              value={editData.episodeNumber}
+              onChange={(e) => setEditData({ ...editData, episodeNumber: e.target.value })}
+              placeholder="Episode #"
+              className="w-full px-2 py-1.5 border border-gray-300 rounded focus:border-blue-500 outline-none text-xs"
+            />
+
+            <textarea
+              value={editData.episodeTitle}
+              onChange={(e) => setEditData({ ...editData, episodeTitle: e.target.value })}
+              placeholder="Episode Title"
+              rows={2}
+              className="w-full px-2 py-1.5 border border-gray-300 rounded focus:border-blue-500 outline-none text-xs resize-none"
+            />
+
+            <input
+              type="date"
+              value={editData.date}
+              onChange={(e) => setEditData({ ...editData, date: e.target.value })}
+              className="w-full px-2 py-1.5 border border-gray-300 rounded focus:border-blue-500 outline-none text-xs"
+            />
+
+            <textarea
+              value={editData.hosts}
+              onChange={(e) => setEditData({ ...editData, hosts: e.target.value })}
+              placeholder="Hosts (comma separated)"
+              rows={2}
+              className="w-full px-2 py-1.5 border border-gray-300 rounded focus:border-blue-500 outline-none text-xs resize-none"
+            />
+
+            <textarea
+              value={editData.guests}
+              onChange={(e) => setEditData({ ...editData, guests: e.target.value })}
+              placeholder="Guests (comma separated)"
+              rows={2}
+              className="w-full px-2 py-1.5 border border-gray-300 rounded focus:border-blue-500 outline-none text-xs resize-none"
+            />
+          </div>
+
+          <div className="flex flex-col gap-1 pt-3 border-t">
+            <button
+              onClick={handleSave}
+              className="w-full px-3 py-1.5 bg-green-500 text-white rounded hover:bg-green-600 text-xs font-medium"
+            >
+              Save
+            </button>
+            <button
+              onClick={handleCancel}
+              className="w-full px-3 py-1.5 bg-gray-500 text-white rounded hover:bg-gray-600 text-xs font-medium"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleDelete}
+              className="w-full px-3 py-1.5 bg-red-500 text-white rounded hover:bg-red-600 text-xs font-medium"
+            >
+              Delete
+            </button>
+          </div>
         </div>
-      </div>
       </>
     );
   }
@@ -166,7 +192,7 @@ export default function EditableEpisodeCard({ episode, onSave, onDelete }: Edita
       <Link href={`/episodes/${episode.id}`} className="block h-full">
         <div className="group relative overflow-hidden cursor-pointer backdrop-blur-sm bg-white/90 border-2 border-white/20 rounded-2xl shadow-xl hover:shadow-2xl h-full flex flex-col transition-all duration-300 hover:border-blue-200/50">
           <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 via-purple-500/5 to-pink-500/5 opacity-0 group-hover:opacity-100 transition-all duration-500 rounded-2xl" />
-          
+
           <div className="relative z-10 flex flex-col h-full p-6">
             <div className="mb-4">
               <div className="mb-3 flex items-center justify-between">
