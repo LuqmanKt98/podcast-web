@@ -179,7 +179,21 @@ export default function MergeManager({ episodes, onMergeComplete, onClose }: Mer
 
             // Clear cache and notify
             clearCache();
-            toast.success(`Merged ${oldNames.length} items into "${trimmedNewName}" (${updatedCount} episodes updated)`);
+            if (updatedCount > 0) {
+                toast.success(`Merged ${oldNames.length} items into "${trimmedNewName}" (${updatedCount} episodes updated)`);
+            } else {
+                toast(
+                    `No episodes updated. The selected items might verify against live database.`,
+                    {
+                        icon: '⚠️',
+                        style: {
+                            borderRadius: '10px',
+                            background: '#333',
+                            color: '#fff',
+                        },
+                    }
+                );
+            }
 
             // Reset selection and refresh
             setItems((prev) => prev.map((item) => ({ ...item, selected: false })));
@@ -245,7 +259,21 @@ export default function MergeManager({ episodes, onMergeComplete, onClose }: Mer
             }
 
             clearCache();
-            toast.success(`Renamed "${oldName}" to "${trimmedNewName}" (${updatedCount} episodes updated)`);
+            if (updatedCount > 0) {
+                toast.success(`Renamed "${oldName}" to "${trimmedNewName}" (${updatedCount} episodes updated)`);
+            } else {
+                toast(
+                    `No episodes updated. "${oldName}" might not exist in the database anymore.`,
+                    {
+                        icon: '⚠️',
+                        style: {
+                            borderRadius: '10px',
+                            background: '#333',
+                            color: '#fff',
+                        },
+                    }
+                );
+            }
             onMergeComplete();
         } catch (error) {
             console.error('Rename error:', error);

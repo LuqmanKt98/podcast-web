@@ -22,9 +22,14 @@ async function loadEpisodesFromFirestore(): Promise<Episode[]> {
     const episodes: Episode[] = [];
     querySnapshot.forEach((doc) => {
       const data = doc.data();
+      // Check for invalid IDs
+      const hasValidId = data.id &&
+        data.id !== 'N/A' &&
+        !data.id.toString().startsWith('N/A-');
+
       episodes.push({
         ...data,
-        id: data.id || doc.id,
+        id: hasValidId ? data.id : doc.id,
         firestoreId: doc.id,
       } as Episode);
     });
@@ -80,14 +85,9 @@ export async function loadEpisodes(): Promise<Episode[]> {
     let episodes: Episode[];
 
     if (USE_FIRESTORE) {
-      try {
-        // Try loading from Firestore first
-        episodes = await loadEpisodesFromFirestore();
-      } catch (firestoreError) {
-        console.warn('Firestore failed, falling back to JSON:', firestoreError);
-        // Fallback to JSON if Firestore fails
-        episodes = await loadEpisodesFromJSON();
-      }
+      // Load directly from Firestore to ensure fresh data
+      // We explicitly avoid falling back to JSON to prevent showing stale data
+      episodes = await loadEpisodesFromFirestore();
     } else {
       // Use JSON directly if Firestore is disabled
       episodes = await loadEpisodesFromJSON();
