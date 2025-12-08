@@ -232,7 +232,7 @@ export function filterEpisodes(
     const series = episode.series || 'Unknown';
     const hosts = episode.hosts || [];
     const guests = episode.guests || [];
-    
+
     if (filters.series && series !== filters.series) {
       return false;
     }
@@ -252,6 +252,23 @@ export function filterEpisodes(
   });
 }
 
+// Helper to parse date consistently
+function parseDate(dateStr: string): number {
+  if (!dateStr) return 0;
+
+  // Handle YYYY-MM-DD
+  const parts = dateStr.split('-');
+  if (parts.length === 3) {
+    const [year, month, day] = parts.map(Number);
+    const date = new Date(year, month - 1, day);
+    if (!isNaN(date.getTime())) return date.getTime();
+  }
+
+  // Fallback to standard parsing
+  const date = new Date(dateStr);
+  return isNaN(date.getTime()) ? 0 : date.getTime();
+}
+
 export function sortEpisodes(
   episodes: Episode[],
   sortBy: 'date-desc' | 'date-asc' | 'title'
@@ -259,10 +276,10 @@ export function sortEpisodes(
   const sorted = [...episodes];
   switch (sortBy) {
     case 'date-desc':
-      sorted.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      sorted.sort((a, b) => parseDate(b.date) - parseDate(a.date));
       break;
     case 'date-asc':
-      sorted.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+      sorted.sort((a, b) => parseDate(a.date) - parseDate(b.date));
       break;
     case 'title':
       sorted.sort((a, b) => a.episodeTitle.localeCompare(b.episodeTitle));

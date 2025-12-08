@@ -1,15 +1,15 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
-import { updateDoc, deleteDoc, doc } from 'firebase/firestore';
+import { updateDoc, deleteDoc, doc, collection, getDocs, writeBatch } from 'firebase/firestore';
 import Header from '@/components/Header';
-import EditableStatsCard from '@/components/EditableStatsCard';
+import StatsCard from '@/components/StatsCard';
 import EditableEpisodeCard from '@/components/EditableEpisodeCard';
-import EditableSeriesCard from '@/components/EditableSeriesCard';
 import FloatingButton from '@/components/FloatingButton';
 import SkeletonLoader from '@/components/SkeletonLoader';
+import MergeManager from '@/components/MergeManager';
 import { Episode, DashboardStats } from '@/lib/types';
 import { loadEpisodes, calculateStats, sortEpisodes, clearCache } from '@/lib/data';
 import { db } from '@/lib/firebase';
@@ -21,38 +21,161 @@ import {
   prefersReducedMotion,
 } from '@/lib/animations';
 
-// Series Breakdown Section with See More functionality
-function SeriesBreakdownSection({ stats }: { stats: DashboardStats }) {
+// Series Breakdown Section with edit and delete functionality
+interface SeriesBreakdownSectionProps {
+  stats: DashboardStats;
+  episodes: Episode[];
+  onSeriesUpdate: (oldSeries: string, newSeries: string) => Promise<void>;
+  onSeriesDelete: (series: string) => Promise<void>;
+  onOpenMergeManager: () => void;
+}
+
+function SeriesBreakdownSection({
+  stats,
+  episodes,
+  onSeriesUpdate,
+  onSeriesDelete,
+  onOpenMergeManager
+}: SeriesBreakdownSectionProps) {
   const [showAll, setShowAll] = useState(false);
+  const [editingSeries, setEditingSeries] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState('');
+  const [isUpdating, setIsUpdating] = useState(false);
   const INITIAL_SHOW_COUNT = 8;
 
   const sortedSeries = Object.entries(stats.seriesBreakdown).sort((a, b) => b[1] - a[1]);
   const displayedSeries = showAll ? sortedSeries : sortedSeries.slice(0, INITIAL_SHOW_COUNT);
   const hasMore = sortedSeries.length > INITIAL_SHOW_COUNT;
 
+  const handleStartEdit = (series: string) => {
+    setEditingSeries(series);
+    setEditValue(series);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingSeries || !editValue.trim()) return;
+    if (editValue.trim() === editingSeries) {
+      setEditingSeries(null);
+      return;
+    }
+
+    setIsUpdating(true);
+    try {
+      await onSeriesUpdate(editingSeries, editValue.trim());
+      setEditingSeries(null);
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setEditingSeries(null);
+    setEditValue('');
+  };
+
+  const handleDelete = async (series: string) => {
+    if (!confirm(`Are you sure you want to delete all episodes in "${series}"? This action cannot be undone.`)) {
+      return;
+    }
+
+    setIsUpdating(true);
+    try {
+      await onSeriesDelete(series);
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
   return (
     <div className="mb-12 card-elevated p-8">
-      <div className="flex items-center justify-between mb-6">
-        <h3 className="text-2xl font-bold gradient-text">
-          Series Breakdown
-        </h3>
-        <span className="text-sm text-slate-500">
-          {sortedSeries.length} series total
-        </span>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+        <div>
+          <h3 className="text-2xl font-bold gradient-text">
+            Series Breakdown
+          </h3>
+          <span className="text-sm text-slate-500">
+            {sortedSeries.length} series total
+          </span>
+        </div>
+        <button
+          onClick={onOpenMergeManager}
+          className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-xl font-semibold hover:from-purple-700 hover:to-blue-700 transition-all shadow-lg hover:shadow-xl text-sm"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+          </svg>
+          Merge Duplicates
+        </button>
       </div>
       <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
         {displayedSeries.map(([series, count]) => (
-          <EditableSeriesCard
+          <motion.div
             key={series}
-            series={series}
-            count={count}
-            onSave={(oldSeries, newSeries, newCount) => {
-              console.log('Save series:', { oldSeries, newSeries, newCount });
-            }}
-            onDelete={(series) => {
-              console.log('Delete series:', series);
-            }}
-          />
+            whileHover={{ scale: 1.02 }}
+            className="rounded-xl bg-gradient-to-br from-slate-50 to-slate-100 p-4 text-center hover:shadow-md transition-all border border-slate-200 relative group"
+          >
+            {/* Edit/Delete Buttons */}
+            <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
+              <button
+                onClick={() => handleStartEdit(series)}
+                disabled={isUpdating}
+                className="p-1 rounded hover:bg-gray-200 disabled:opacity-50"
+                title="Rename series"
+              >
+                <svg className="w-3 h-3 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
+              </button>
+              <button
+                onClick={() => handleDelete(series)}
+                disabled={isUpdating}
+                className="p-1 rounded hover:bg-red-200 disabled:opacity-50"
+                title="Delete series (removes all episodes)"
+              >
+                <svg className="w-3 h-3 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+              </button>
+            </div>
+
+            {editingSeries === series ? (
+              <div className="space-y-2">
+                <p className="text-2xl font-bold gradient-text">{count}</p>
+                <input
+                  type="text"
+                  value={editValue}
+                  onChange={(e) => setEditValue(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleSaveEdit();
+                    if (e.key === 'Escape') handleCancelEdit();
+                  }}
+                  autoFocus
+                  className="text-sm font-medium text-slate-700 bg-white border border-blue-300 rounded px-2 py-1 w-full text-center focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <div className="flex gap-1 justify-center mt-2">
+                  <button
+                    onClick={handleSaveEdit}
+                    disabled={isUpdating}
+                    className="px-2 py-1 bg-green-500 text-white rounded text-xs hover:bg-green-600 disabled:opacity-50"
+                  >
+                    {isUpdating ? '...' : 'Save'}
+                  </button>
+                  <button
+                    onClick={handleCancelEdit}
+                    disabled={isUpdating}
+                    className="px-2 py-1 bg-gray-500 text-white rounded text-xs hover:bg-gray-600 disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <p className="text-2xl font-bold gradient-text">{count}</p>
+                <p className="text-sm font-medium text-slate-700">{series}</p>
+              </>
+            )}
+          </motion.div>
         ))}
       </div>
       {hasMore && (
@@ -87,6 +210,19 @@ export default function Dashboard() {
   const [episodes, setEpisodes] = useState<Episode[]>([]);
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showMergeManager, setShowMergeManager] = useState(false);
+
+  // Refresh data from Firebase
+  const refreshData = async () => {
+    try {
+      clearCache();
+      const data = await loadEpisodes();
+      setEpisodes(data);
+      setStats(calculateStats(data));
+    } catch (error) {
+      console.error('Error refreshing data:', error);
+    }
+  };
 
   const handleEpisodeUpdate = async (episodeId: string, updates: Partial<Episode>) => {
     const episode = episodes.find(e => e.id === episodeId);
@@ -118,6 +254,56 @@ export default function Dashboard() {
     }
   };
 
+  // Update series name for all episodes with that series
+  const handleSeriesUpdate = async (oldSeries: string, newSeries: string) => {
+    try {
+      const episodesRef = collection(db, 'episodes');
+      const snapshot = await getDocs(episodesRef);
+
+      let updatedCount = 0;
+
+      for (const docSnap of snapshot.docs) {
+        const data = docSnap.data();
+        if (data.series === oldSeries) {
+          await updateDoc(doc(db, 'episodes', docSnap.id), { series: newSeries });
+          updatedCount++;
+        }
+      }
+
+      clearCache();
+      await refreshData();
+      toast.success(`Renamed "${oldSeries}" to "${newSeries}" (${updatedCount} episodes updated)`);
+    } catch (error) {
+      console.error('Series update error:', error);
+      toast.error(`Failed to update series: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  };
+
+  // Delete all episodes with a specific series
+  const handleSeriesDelete = async (series: string) => {
+    try {
+      const episodesRef = collection(db, 'episodes');
+      const snapshot = await getDocs(episodesRef);
+
+      let deletedCount = 0;
+
+      for (const docSnap of snapshot.docs) {
+        const data = docSnap.data();
+        if (data.series === series) {
+          await deleteDoc(doc(db, 'episodes', docSnap.id));
+          deletedCount++;
+        }
+      }
+
+      clearCache();
+      await refreshData();
+      toast.success(`Deleted series "${series}" (${deletedCount} episodes removed)`);
+    } catch (error) {
+      console.error('Series delete error:', error);
+      toast.error(`Failed to delete series: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  };
+
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -141,6 +327,38 @@ export default function Dashboard() {
   }, [episodes]);
 
   const recentEpisodes = sortEpisodes(episodes, 'date-desc').slice(0, 6);
+
+  // Format date for display
+  const formatDate = (dateStr: string) => {
+    if (!dateStr || dateStr === 'N/A') return 'N/A';
+    try {
+      // Handle YYYY-MM-DD format explicitly
+      const parts = dateStr.split('-');
+      if (parts.length === 3) {
+        const [year, month, day] = parts.map(Number);
+        const date = new Date(year, month - 1, day);
+        if (!isNaN(date.getTime())) {
+          return date.toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric'
+          });
+        }
+      }
+      // Fallback: try parsing directly
+      const parsed = new Date(dateStr);
+      if (!isNaN(parsed.getTime())) {
+        return parsed.toLocaleDateString('en-US', {
+          year: 'numeric',
+          month: 'short',
+          day: 'numeric'
+        });
+      }
+      return dateStr;
+    } catch {
+      return dateStr;
+    }
+  };
 
   if (loading) {
     return (
@@ -194,7 +412,7 @@ export default function Dashboard() {
           </div>
         </motion.div>
 
-        {/* Stats Grid */}
+        {/* Stats Grid - Read-only computed values */}
         {stats && (
           <motion.div
             variants={reducedMotion ? {} : staggerContainerVariants}
@@ -203,59 +421,35 @@ export default function Dashboard() {
             className="mb-12 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4"
           >
             <motion.div variants={reducedMotion ? {} : staggerItemVariants}>
-              <EditableStatsCard
+              <StatsCard
                 label="Total Episodes"
                 value={stats.totalEpisodes}
                 color="blue"
                 icon="📻"
-                onSave={(newLabel, newValue) => {
-                  console.log('Updated:', newLabel, '=', newValue);
-                  // Update stats in state
-                  setStats(prev => prev ? { ...prev, totalEpisodes: Number(newValue) } : null);
-                }}
               />
             </motion.div>
             <motion.div variants={reducedMotion ? {} : staggerItemVariants}>
-              <EditableStatsCard
+              <StatsCard
                 label="Unique Guests"
                 value={stats.totalGuests}
                 color="purple"
                 icon="👥"
-                onSave={(newLabel, newValue) => {
-                  console.log('Updated:', newLabel, '=', newValue);
-                  setStats(prev => prev ? { ...prev, totalGuests: Number(newValue) } : null);
-                }}
               />
             </motion.div>
             <motion.div variants={reducedMotion ? {} : staggerItemVariants}>
-              <EditableStatsCard
+              <StatsCard
                 label="Unique Hosts"
                 value={stats.totalHosts}
                 color="green"
                 icon="🎙️"
-                onSave={(newLabel, newValue) => {
-                  console.log('Updated:', newLabel, '=', newValue);
-                  setStats(prev => prev ? { ...prev, totalHosts: Number(newValue) } : null);
-                }}
               />
             </motion.div>
             <motion.div variants={reducedMotion ? {} : staggerItemVariants}>
-              <EditableStatsCard
+              <StatsCard
                 label="Date Range"
-                value={`${stats.dateRange.earliest} to ${stats.dateRange.latest}`}
+                value={`${formatDate(stats.dateRange.earliest)} - ${formatDate(stats.dateRange.latest)}`}
                 color="orange"
                 icon="📅"
-                isDateRange={true}
-                onSave={(newLabel, newValue) => {
-                  console.log('Updated:', newLabel, '=', newValue);
-                  const parts = String(newValue).split(' to ');
-                  if (parts.length === 2) {
-                    setStats(prev => prev ? {
-                      ...prev,
-                      dateRange: { earliest: parts[0], latest: parts[1] }
-                    } : null);
-                  }
-                }}
               />
             </motion.div>
           </motion.div>
@@ -263,7 +457,13 @@ export default function Dashboard() {
 
         {/* Series Breakdown */}
         {stats && Object.keys(stats.seriesBreakdown).length > 0 && (
-          <SeriesBreakdownSection stats={stats} />
+          <SeriesBreakdownSection
+            stats={stats}
+            episodes={episodes}
+            onSeriesUpdate={handleSeriesUpdate}
+            onSeriesDelete={handleSeriesDelete}
+            onOpenMergeManager={() => setShowMergeManager(true)}
+          />
         )}
 
         {/* Recent Episodes */}
@@ -310,6 +510,17 @@ export default function Dashboard() {
       </main>
 
       <FloatingButton />
+
+      {/* Merge Manager Modal */}
+      <AnimatePresence>
+        {showMergeManager && (
+          <MergeManager
+            episodes={episodes}
+            onMergeComplete={refreshData}
+            onClose={() => setShowMergeManager(false)}
+          />
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }
