@@ -148,23 +148,23 @@ export default function MergeManager({ episodes, onMergeComplete, onClose }: Mer
                         needsUpdate = true;
                     }
                 } else if (activeTab === 'hosts') {
-                    const hosts = data.hosts || [];
+                    const hosts = (data.hosts as string[]) || [];
                     const newHosts = hosts.map((h: string) =>
                         oldNames.includes(h.trim()) ? trimmedNewName : h
                     );
                     // Remove duplicates after merge
-                    const uniqueHosts = [...new Set(newHosts)];
+                    const uniqueHosts: string[] = Array.from(new Set(newHosts));
                     if (JSON.stringify(hosts) !== JSON.stringify(uniqueHosts)) {
                         updates.hosts = uniqueHosts;
                         needsUpdate = true;
                     }
                 } else if (activeTab === 'guests') {
-                    const guests = data.guests || [];
+                    const guests = (data.guests as string[]) || [];
                     const newGuests = guests.map((g: string) =>
                         oldNames.includes(g.trim()) ? trimmedNewName : g
                     );
                     // Remove duplicates after merge
-                    const uniqueGuests = [...new Set(newGuests)];
+                    const uniqueGuests: string[] = Array.from(new Set(newGuests));
                     if (JSON.stringify(guests) !== JSON.stringify(uniqueGuests)) {
                         updates.guests = uniqueGuests;
                         needsUpdate = true;
@@ -225,13 +225,13 @@ export default function MergeManager({ episodes, onMergeComplete, onClose }: Mer
                         needsUpdate = true;
                     }
                 } else if (activeTab === 'hosts') {
-                    const hosts = data.hosts || [];
+                    const hosts = (data.hosts as string[]) || [];
                     if (hosts.includes(oldName)) {
                         updates.hosts = hosts.map((h: string) => (h === oldName ? trimmedNewName : h));
                         needsUpdate = true;
                     }
                 } else if (activeTab === 'guests') {
-                    const guests = data.guests || [];
+                    const guests = (data.guests as string[]) || [];
                     if (guests.includes(oldName)) {
                         updates.guests = guests.map((g: string) => (g === oldName ? trimmedNewName : g));
                         needsUpdate = true;
@@ -300,8 +300,8 @@ export default function MergeManager({ episodes, onMergeComplete, onClose }: Mer
                             key={tab}
                             onClick={() => setActiveTab(tab)}
                             className={`flex items-center gap-2 px-4 py-2 rounded-xl font-semibold transition-all ${activeTab === tab
-                                    ? 'gradient-primary text-white shadow-lg'
-                                    : 'bg-white border border-slate-200 text-slate-700 hover:border-blue-300'
+                                ? 'gradient-primary text-white shadow-lg'
+                                : 'bg-white border border-slate-200 text-slate-700 hover:border-blue-300'
                                 }`}
                         >
                             <span>{tabConfig[tab].icon}</span>
@@ -479,8 +479,8 @@ function MergeItemRow({ item, onToggle, onUseAsName, onRename, isDisabled, tabTy
     return (
         <div
             className={`flex items-center gap-3 p-3 rounded-xl border transition-all ${item.selected
-                    ? 'border-blue-300 bg-blue-50'
-                    : 'border-slate-200 bg-white hover:border-slate-300'
+                ? 'border-blue-300 bg-blue-50'
+                : 'border-slate-200 bg-white hover:border-slate-300'
                 }`}
         >
             {/* Checkbox */}
@@ -488,8 +488,8 @@ function MergeItemRow({ item, onToggle, onUseAsName, onRename, isDisabled, tabTy
                 onClick={onToggle}
                 disabled={isDisabled}
                 className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${item.selected
-                        ? 'bg-blue-600 border-blue-600 text-white'
-                        : 'border-slate-300 hover:border-blue-400'
+                    ? 'bg-blue-600 border-blue-600 text-white'
+                    : 'border-slate-300 hover:border-blue-400'
                     }`}
             >
                 {item.selected && (
